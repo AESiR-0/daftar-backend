@@ -36,7 +36,5 @@ def verify_google_token(token: str):
     except ValueError:
         # For development/testing purposes
         return {
-            "email": "test@example.com",
-            "name": "Test User",
-            "picture": "https://example.com/picture.jpg"
+           "message": "Invalid token"
         }

@@ -13,7 +13,6 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
     """Handle Google OAuth login"""
     # Verify the Google token
     user_info = verify_google_token(auth_request.token)
-    
     # Extract user information
     email = user_info["email"]
     name = user_info.get("name")

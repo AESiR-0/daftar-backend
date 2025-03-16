@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from database import get_db
-from schemas.investor import InvestorProfileResponse, DaftarProfileResponse, DaftarInvestorResponse, DaftarInvestorCreate, SampleQuestionResponse, CustomQuestionCreate, CustomQuestionResponse
+from schemas.investor import InvestorProfileResponse, DaftarProfileResponse, DaftarInvestorResponse, DaftarInvestorCreate, SampleQuestionResponse, CustomQuestionCreate, CustomQuestionResponse, InvestorNoteCreate, InvestorNoteResponse, TeamMemberAnalysisCreate, TeamMemberAnalysisResponse
 from typing import List, Optional
 from schemas.document import DocumentCreate, DocumentResponse
 from schemas.offer import OfferCreate, OfferResponse, OfferActionCreate
@@ -670,4 +670,156 @@ async def create_bill(
     )
     
     await db.commit()
-    return result.first() 
+    return result.first()
+
+@router.post("/pitches/{pitch_id}/notes", response_model=InvestorNoteResponse)
+async def create_investor_note(
+    pitch_id: int,
+    investor_id: int,
+    note: InvestorNoteCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a note for a specific pitch"""
+    # Verify investor has access to this pitch
+    access_check = await db.execute(
+        text("""
+            SELECT 1 FROM pitches p
+            JOIN scouts s ON p.scout_id = s.id
+            JOIN daftar_investors di ON s.daftar_id = di.daftar_id
+            WHERE p.id = :pitch_id 
+            AND di.investor_id = :investor_id
+            AND di.is_active = true
+        """),
+        {
+            "pitch_id": pitch_id,
+            "investor_id": investor_id
+        }
+    )
+    
+    if not access_check.first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pitch not found or investor does not have access"
+        )
+    
+    result = await db.execute(
+        text("""
+            INSERT INTO investor_notes (
+                pitch_id, investor_id, note_text, created_at
+            )
+            VALUES (
+                :pitch_id, :investor_id, :note_text, CURRENT_TIMESTAMP
+            )
+            RETURNING *
+        """),
+        {
+            "pitch_id": pitch_id,
+            "investor_id": investor_id,
+            "note_text": note.note_text
+        }
+    )
+    
+    await db.commit()
+    return result.first()
+
+@router.get("/pitches/{pitch_id}/notes", response_model=List[InvestorNoteResponse])
+async def get_investor_notes(
+    pitch_id: int,
+    investor_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all notes for a specific pitch"""
+    result = await db.execute(
+        text("""
+            SELECT * FROM investor_notes
+            WHERE pitch_id = :pitch_id
+            AND investor_id = :investor_id
+            ORDER BY created_at DESC
+        """),
+        {
+            "pitch_id": pitch_id,
+            "investor_id": investor_id
+        }
+    )
+    
+    return result.fetchall()
+
+@router.post("/pitches/{pitch_id}/team-analysis", response_model=TeamMemberAnalysisResponse)
+async def create_team_analysis(
+    pitch_id: int,
+    team_member_id: int,
+    analysis: TeamMemberAnalysisCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a team member analysis for a specific pitch"""
+    # Verify team member has access
+    access_check = await db.execute(
+        text("""
+            SELECT 1 FROM pitches p
+            JOIN scouts s ON p.scout_id = s.id
+            JOIN daftar_team_members dtm ON s.daftar_id = dtm.daftar_id
+            WHERE p.id = :pitch_id 
+            AND dtm.id = :team_member_id
+            AND dtm.is_active = true
+        """),
+        {
+            "pitch_id": pitch_id,
+            "team_member_id": team_member_id
+        }
+    )
+    
+    if not access_check.first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Pitch not found or team member does not have access"
+        )
+    
+    result = await db.execute(
+        text("""
+            INSERT INTO team_member_analysis (
+                pitch_id, team_member_id, market_analysis, competitive_analysis,
+                financial_analysis, team_analysis, overall_analysis,
+                created_at
+            )
+            VALUES (
+                :pitch_id, :team_member_id, :market_analysis, :competitive_analysis,
+                :financial_analysis, :team_analysis, :overall_analysis,
+                CURRENT_TIMESTAMP
+            )
+            RETURNING *
+        """),
+        {
+            "pitch_id": pitch_id,
+            "team_member_id": team_member_id,
+            "market_analysis": analysis.market_analysis,
+            "competitive_analysis": analysis.competitive_analysis,
+            "financial_analysis": analysis.financial_analysis,
+            "team_analysis": analysis.team_analysis,
+            "overall_analysis": analysis.overall_analysis
+        }
+    )
+    
+    await db.commit()
+    return result.first()
+
+@router.get("/pitches/{pitch_id}/team-analysis", response_model=List[TeamMemberAnalysisResponse])
+async def get_team_analysis(
+    pitch_id: int,
+    team_member_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all team analyses for a specific pitch"""
+    result = await db.execute(
+        text("""
+            SELECT * FROM team_member_analysis
+            WHERE pitch_id = :pitch_id
+            AND team_member_id = :team_member_id
+            ORDER BY created_at DESC
+        """),
+        {
+            "pitch_id": pitch_id,
+            "team_member_id": team_member_id
+        }
+    )
+    
+    return result.fetchall() 

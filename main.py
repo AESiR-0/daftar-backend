@@ -1,9 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from database import init_db
 from routes import founder, investor, scout, auth, pitch
 import logging
+from sqlalchemy.ext.asyncio import AsyncSession
+from database import get_db
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +41,13 @@ app.include_router(scout.router)
 app.include_router(pitch.router)
 
 @app.get("/")
-async def root():
+async def root(db: AsyncSession = Depends(get_db)):
     """Health check endpoint"""
-    return {"status": "healthy"}
+    try:
+        await db.execute(text("SELECT 1"))
+        return {"status": "healthy"}
+    except Exception as e:
+        logger.error(f"Database connection error: {str(e)}")
+        return {"status": "unhealthy", "error": 'Database connection error'}
 
 
