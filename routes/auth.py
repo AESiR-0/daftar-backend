@@ -13,9 +13,18 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
     """Handle Google OAuth login"""
     # Verify the Google token
     user_info = verify_google_token(auth_request.token)
-    # Extract user information
-    email = user_info["email"]
-    name = user_info.get("name")
+    print(user_info)  # Log the user_info to see what it contains
+
+    # Check if email is present in user_info
+    email = user_info.get("email")
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email not found in Google token"
+        )
+
+    first_name = user_info.get("given_name", "")
+    last_name = user_info.get("family_name", "")
     picture = user_info.get("picture")
     
     if auth_request.user_type == "founder":
@@ -26,13 +35,23 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
         founder = result.first()
         
         if not founder:
-            # Create new founder
+            # Create new founder with required fields
             await db.execute(
                 text("""
-                    INSERT INTO founders (email, name, created_at, updated_at)
-                    VALUES (:email, :name, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO founders (
+                        email, first_name, last_name, gender, phone,
+                        password_hashed, is_active, created_at
+                    )
+                    VALUES (
+                        :email, :first_name, :last_name, 'Not Specified', 'Not Specified',
+                        'google_auth', true, CURRENT_TIMESTAMP
+                    )
                 """),
-                {"email": email, "name": name}
+                {
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name
+                }
             )
             await db.commit()
         
@@ -50,13 +69,23 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
         investor = result.first()
         
         if not investor:
-            # Create new investor
+            # Create new investor with required fields
             await db.execute(
                 text("""
-                    INSERT INTO investors (email, name, created_at, updated_at)
-                    VALUES (:email, :name, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    INSERT INTO investors (
+                        email, first_name, last_name, gender, phone,
+                        password_hashed, is_active, created_at
+                    )
+                    VALUES (
+                        :email, :first_name, :last_name, 'Not Specified', 'Not Specified',
+                        'google_auth', true, CURRENT_TIMESTAMP
+                    )
                 """),
-                {"email": email, "name": name}
+                {
+                    "email": email,
+                    "first_name": first_name,
+                    "last_name": last_name
+                }
             )
             await db.commit()
         
@@ -65,7 +94,7 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
             data={"sub": email, "role": "investor"},
             expires_delta=timedelta(minutes=30)
         )
-        
+    
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -77,6 +106,6 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
         "token_type": "bearer",
         "user_type": auth_request.user_type,
         "email": email,
-        "name": name,
+        "name": f"{first_name} {last_name}",
         "picture": picture
     } 
