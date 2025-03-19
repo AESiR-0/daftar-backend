@@ -16,7 +16,7 @@ async def login(auth_request: GoogleAuthRequest, db: AsyncSession = Depends(get_
     print(user_info)  # Log the user_info to see what it contains
 
     # Check if email is present in user_info
-    email = user_info.get("email")
+    email = user_info["email"]
     if not email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

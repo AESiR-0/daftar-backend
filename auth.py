@@ -33,8 +33,9 @@ def verify_google_token(token: str):
         if idinfo['aud'] != GOOGLE_CLIENT_ID:
             raise ValueError('Wrong audience.')
         return idinfo
-    except ValueError:
+    except Exception as e:
         # For development/testing purposes
+        print(e)
         return {
            "message": "Invalid token"
         }

@@ -9,7 +9,6 @@ class Scout(Base):
     id = Column(Integer, primary_key=True, index=True)
     daftar_id = Column(Integer, ForeignKey("daftars.id"), nullable=False)
     name = Column(String(255), nullable=False)
-    vision = Column(Text, nullable=True)
     
     # Audience Details
     location = Column(String(255), nullable=True)

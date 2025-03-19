@@ -9,7 +9,7 @@ from schemas.scout import (
     ScoutScheduleCreate, ScoutScheduleResponse,
     ScoutUpdateCreate, ScoutUpdateResponse
 )
-from typing import List
+from typing import List, Optional
 
 router = APIRouter(prefix="/scouts", tags=["scout"])
 
@@ -146,26 +146,29 @@ async def create_scout_faq(
 
 @router.get("/", response_model=List[ScoutResponse])
 async def get_scouts(
-    daftar_id: int,
+    daftar_id: Optional[int] = None,  # Make daftar_id optional
     include_archived: bool = False,  # Optional parameter to include archived scouts
     db: AsyncSession = Depends(get_db)
 ):
-    """Get all scouts for a daftar"""
-    query = """
-        SELECT * FROM scouts 
-        WHERE daftar_id = :daftar_id
-    """
-    
+    """Get all scouts, optionally filtered by daftar_id"""
+    query = "SELECT * FROM scouts WHERE 1=1"  # Base query
+
+    # Add condition for daftar_id if provided
+    if daftar_id is not None:
+        query += " AND daftar_id = :daftar_id"
+
+    # Exclude archived scouts unless specified
     if not include_archived:
         query += " AND status != 'archived'"
-    
+
     query += " ORDER BY created_at DESC"
-    
+
+    # Execute query with or without daftar_id
     result = await db.execute(
         text(query),
-        {"daftar_id": daftar_id}
+        {"daftar_id": daftar_id} if daftar_id is not None else {}
     )
-    
+
     scouts = result.fetchall()
     return [dict(scout) for scout in scouts]
 
